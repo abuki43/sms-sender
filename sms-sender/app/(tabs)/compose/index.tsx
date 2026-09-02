@@ -18,6 +18,7 @@ import {
 import { useRouter } from "expo-router";
 import { useContactsStore } from "../../../stores/contacts";
 import { useBulkSend } from "../../../hooks/useBulkSend";
+import { requestSmsPermissions } from "../../../lib/permissions";
 import { SimCard } from "../../../modules/expo-sim-sms/src";
 import { RATE_LIMIT_WARNING_THRESHOLD } from "../../../lib/constants";
 
@@ -27,6 +28,7 @@ export default function ComposeScreen() {
   const [sims, setSims] = useState<SimCard[]>([]);
   const [simId, setSimId] = useState<string>("default");
   const [confirming, setConfirming] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const router = useRouter();
   const selectedContacts = useContactsStore((s) => s.selectedContacts);
   const { start, getSimCards } = useBulkSend();
@@ -57,7 +59,12 @@ export default function ComposeScreen() {
     phone: c.phoneNumbers[0]?.number ?? "",
   })).filter((r) => r.phone.length > 0);
 
-  const startSend = () => {
+  const startSend = async () => {
+    const perm = await requestSmsPermissions();
+    if (perm.status !== "granted") {
+      setPermissionDenied(true);
+      return;
+    }
     start({
       recipients,
       message,
@@ -223,6 +230,28 @@ export default function ComposeScreen() {
                     </Button>
                   </AlertDialog.Action>
                 </XGroup>
+              </YStack>
+            </AlertDialog.Content>
+          </AlertDialog.Portal>
+        </AlertDialog>
+
+        <AlertDialog open={permissionDenied} onOpenChange={setPermissionDenied}>
+          <AlertDialog.Portal>
+            <AlertDialog.Overlay key="overlay" opacity={0.5} bg="$black" />
+            <AlertDialog.Content key="content" bordered elevate>
+              <YStack gap="$3">
+                <AlertDialog.Title>SMS permission needed</AlertDialog.Title>
+                <AlertDialog.Description asChild>
+                  <Text color="$gray10">
+                    The app needs SMS and Phone permissions to send messages.
+                    Grant them in Settings and try again.
+                  </Text>
+                </AlertDialog.Description>
+                <AlertDialog.Action asChild>
+                  <Button flex={1} theme="blue">
+                    <Text>OK</Text>
+                  </Button>
+                </AlertDialog.Action>
               </YStack>
             </AlertDialog.Content>
           </AlertDialog.Portal>
