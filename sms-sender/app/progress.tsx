@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { useLocalSearchParams } from "expo-router";
+import { Linking } from "react-native";
 import { YStack, XStack, Text, Button, Spinner, H3, Paragraph, Separator } from "tamagui";
 import ExpoSimSms, { SimCard, SmsStatusEvent } from "../modules/expo-sim-sms/src";
+import {
+  checkSmsPermissions,
+  requestSmsPermissions,
+  SmsPermissionResult,
+} from "../lib/permissions";
 
 type Stage = "idle" | "loading" | "sending" | "done" | "error";
+type PermState = "checking" | "granted" | "denied";
 
 export default function ProgressScreen() {
   const { message, phone, count } = useLocalSearchParams<{
@@ -17,6 +24,8 @@ export default function ProgressScreen() {
   const [stage, setStage] = useState<Stage>("idle");
   const [result, setResult] = useState<string | null>(null);
   const [events, setEvents] = useState<SmsStatusEvent[]>([]);
+  const [permState, setPermState] = useState<PermState>("checking");
+  const [permResult, setPermResult] = useState<SmsPermissionResult | null>(null);
 
   const last = events[events.length - 1] ?? null;
 
@@ -35,8 +44,28 @@ export default function ProgressScreen() {
     }
   }, []);
 
+  const requestPermissions = useCallback(async () => {
+    setPermState("checking");
+    const result = await requestSmsPermissions();
+    setPermResult(result);
+    if (result.status === "granted") {
+      setPermState("granted");
+      loadSims();
+    } else {
+      setPermState("denied");
+    }
+  }, [loadSims]);
+
   useEffect(() => {
-    loadSims();
+    (async () => {
+      const granted = await checkSmsPermissions();
+      if (granted) {
+        setPermState("granted");
+        loadSims();
+      } else {
+        setPermState("denied");
+      }
+    })();
   }, [loadSims]);
 
   useEffect(() => {
@@ -47,6 +76,12 @@ export default function ProgressScreen() {
   }, []);
 
   const sendTest = useCallback(async () => {
+    const granted = await checkSmsPermissions();
+    if (!granted) {
+      setStage("error");
+      setResult("SMS / Phone permissions are required to send.");
+      return;
+    }
     if (!phone) {
       setStage("error");
       setResult("No recipient phone number found for the selected contact.");
@@ -73,9 +108,38 @@ export default function ProgressScreen() {
     }
   }, [phone, message, selectedSim]);
 
+  const canAskAgain = permResult?.status === "denied" ? permResult.canAskAgain : true;
+
   return (
     <YStack p="$4" gap="$4" flex={1}>
       <H3>Phase 1 · SMS Module Test</H3>
+
+      {permState === "denied" && (
+        <YStack gap="$2" p="$3" bg="$orange2" rounded="$3" borderWidth={1} borderColor="$orange8">
+          <Text color="$orange11" fontWeight="bold">
+            SMS & Phone permissions required
+          </Text>
+          <Paragraph size="$3" color="$orange11">
+            SMS Sender needs SMS and Phone permissions to detect SIM cards and
+            send messages.
+          </Paragraph>
+          <XStack gap="$2">
+            {canAskAgain ? (
+              <Button size="$3" theme="orange" onPress={requestPermissions}>
+                <Text>Grant permissions</Text>
+              </Button>
+            ) : (
+              <Button
+                size="$3"
+                theme="orange"
+                onPress={() => Linking.openSettings()}
+              >
+                <Text>Open Settings</Text>
+              </Button>
+            )}
+          </XStack>
+        </YStack>
+      )}
 
       <YStack gap="$2">
         <Text fontWeight="bold">Recipient</Text>
@@ -150,7 +214,7 @@ export default function ProgressScreen() {
       <Button
         theme="blue"
         size="$5"
-        disabled={stage === "sending" || !phone}
+        disabled={stage === "sending" || !phone || permState !== "granted"}
         onPress={sendTest}
       >
         <Text>
