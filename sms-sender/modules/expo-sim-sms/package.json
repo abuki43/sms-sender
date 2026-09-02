@@ -1,0 +1,19 @@
+{
+  "name": "expo-sim-sms",
+  "version": "0.1.0",
+  "description": "Custom Expo module for sending bulk SMS with dual SIM support on Android",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "keywords": [
+    "react-native",
+    "expo",
+    "sms",
+    "sim",
+    "bulk-sms"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "expo": "*",
+    "expo-modules-core": "*"
+  }
+}
