@@ -547,14 +547,13 @@ npx expo install tamagui @tamagui/config @tamagui/metro-plugin expo-dev-client e
 npx expo prebuild --clean
 
 # Development
-npx expo run:android          # Build and run on connected device
 npx expo start --dev-client   # Start dev server for hot reload
 
-# Production APK (local build)
-eas build -p android --profile production --local
-# OR
-cd android && ./gradlew assembleRelease
+# Production APK via EAS (distributed for the user to sideload on their phone)
+eas build -p android --profile production
 ```
+
+> **Testing approach:** There is no emulator workflow. To test, build an APK with EAS (`eas build -p android --profile production`), download/install it on the developer's physical Android phone, and run the tests in the [Testing Plan](#testing-plan) manually.
 
 ### Build Requirements
 
@@ -567,6 +566,8 @@ cd android && ./gradlew assembleRelease
 ---
 
 ## Testing Plan
+
+> All tests are performed **manually** by the developer on a physical Android phone using an **APK built with EAS** (`eas build -p android --profile production`). No emulator is used.
 
 1. **Single SIM test** — Send SMS to one number, verify it arrives
 2. **Dual SIM test** — If device has dual SIM, verify SIM selection works and correct SIM sends
@@ -586,11 +587,11 @@ cd android && ./gradlew assembleRelease
 
 | Phase | Work | Days |
 |---|---|---|
-| Phase 0 | Project scaffold + Tamagui setup + verify runs on device | 1-2 |
-| Phase 1 | Custom SMS Expo Module (Kotlin) + test SMS on device | 2-3 |
+| Phase 0 | Project scaffold + Tamagui setup + verify APK runs on phone | 1-2 |
+| Phase 1 | Custom SMS Expo Module (Kotlin) + test SMS via EAS APK | 2-3 |
 | Phase 2 | Bulk send orchestrator (TypeScript) + SQLite history | 1-2 |
 | Phase 3 | UI screens (Tamagui) — Compose, Contacts, Progress, History | 3-4 |
-| Phase 4 | Permissions flow + edge cases + APK build + device testing | 1-2 |
+| Phase 4 | Permissions flow + edge cases + EAS APK build + manual testing | 1-2 |
 | **Total** | | **~8-13 days** |
 
 ---
