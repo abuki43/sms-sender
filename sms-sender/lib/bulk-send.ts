@@ -38,6 +38,7 @@ export interface BulkSendProgress {
   perRecipient: RecipientStatus[];
   isRunning: boolean;
   isPaused: boolean;
+  message: string;
 }
 
 export interface BulkSendOptions {
@@ -96,6 +97,7 @@ class BulkSendOrchestrator {
       perRecipient,
       isRunning: this.isRunning,
       isPaused: this.isPaused,
+      message: this.message,
     };
   }
 

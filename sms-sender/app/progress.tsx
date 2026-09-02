@@ -1,226 +1,195 @@
-import { useCallback, useEffect, useState } from "react";
-import { useLocalSearchParams } from "expo-router";
-import { Linking } from "react-native";
-import { YStack, XStack, Text, Button, Spinner, H3, Paragraph, Separator } from "tamagui";
-import ExpoSimSms, { SimCard, SmsStatusEvent } from "../modules/expo-sim-sms/src";
+import { useEffect, useRef, useState } from "react";
+import { ScrollView } from "react-native";
 import {
-  checkSmsPermissions,
-  requestSmsPermissions,
-  SmsPermissionResult,
-} from "../lib/permissions";
+  YStack,
+  XStack,
+  Text,
+  Button,
+  H3,
+  Paragraph,
+  Separator,
+  Progress,
+  Spinner,
+} from "tamagui";
+import { useBulkSend } from "../hooks/useBulkSend";
+import { describeError } from "../lib/error-handler";
+import { initDatabase, saveSendHistory } from "../lib/storage";
+import {
+  RecipientStatus,
+  SendStatus,
+} from "../lib/bulk-send";
+import { Badge } from "../components/Badge";
 
-type Stage = "idle" | "loading" | "sending" | "done" | "error";
-type PermState = "checking" | "granted" | "denied";
+const STATUS_META: Record<SendStatus, { label: string; color: string }> = {
+  queued: { label: "Queued", color: "$gray11" },
+  sending: { label: "Sending", color: "$blue10" },
+  sent: { label: "Sent", color: "$green10" },
+  delivered: { label: "Delivered", color: "$green10" },
+  failed: { label: "Failed", color: "$red10" },
+};
 
 export default function ProgressScreen() {
-  const { message, phone, count } = useLocalSearchParams<{
-    message?: string;
-    phone?: string;
-    count?: string;
-  }>();
+  const { progress, pause, resume, cancel, retryFailed } = useBulkSend();
+  const {
+    sent,
+    delivered,
+    failed,
+    total,
+    perRecipient,
+    isRunning,
+    isPaused,
+    message,
+  } = progress;
 
-  const [sims, setSims] = useState<SimCard[]>([]);
-  const [selectedSim, setSelectedSim] = useState<number | null>(null);
-  const [stage, setStage] = useState<Stage>("idle");
-  const [result, setResult] = useState<string | null>(null);
-  const [events, setEvents] = useState<SmsStatusEvent[]>([]);
-  const [permState, setPermState] = useState<PermState>("checking");
-  const [permResult, setPermResult] = useState<SmsPermissionResult | null>(null);
+  const doneCount = sent + delivered + failed;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
-  const last = events[events.length - 1] ?? null;
-
-  const loadSims = useCallback(async () => {
-    setStage("loading");
-    try {
-      const cards = await ExpoSimSms.getSimCards();
-      setSims(cards);
-      if (cards.length === 1) {
-        setSelectedSim(cards[0].subscriptionId);
-      }
-      setStage("idle");
-    } catch (e) {
-      setStage("error");
-      setResult(`Failed to read SIMs: ${(e as Error).message}`);
-    }
-  }, []);
-
-  const requestPermissions = useCallback(async () => {
-    setPermState("checking");
-    const result = await requestSmsPermissions();
-    setPermResult(result);
-    if (result.status === "granted") {
-      setPermState("granted");
-      loadSims();
-    } else {
-      setPermState("denied");
-    }
-  }, [loadSims]);
+  const wasRunning = useRef(isRunning);
+  const savedRef = useRef(false);
 
   useEffect(() => {
-    (async () => {
-      const granted = await checkSmsPermissions();
-      if (granted) {
-        setPermState("granted");
-        loadSims();
-      } else {
-        setPermState("denied");
-      }
-    })();
-  }, [loadSims]);
-
-  useEffect(() => {
-    const sub = ExpoSimSms.addListener("onSmsStatus", (event) => {
-      setEvents((prev) => [...prev, event]);
-    });
-    return () => sub.remove();
+    initDatabase();
   }, []);
 
-  const sendTest = useCallback(async () => {
-    const granted = await checkSmsPermissions();
-    if (!granted) {
-      setStage("error");
-      setResult("SMS / Phone permissions are required to send.");
-      return;
+  // When a run finishes (was running -> now stopped) persist to history once.
+  useEffect(() => {
+    if (wasRunning.current && !isRunning && total > 0 && perRecipient.length > 0) {
+      if (!savedRef.current) {
+        savedRef.current = true;
+        void saveSendHistory({
+          message,
+          timestamp: Date.now(),
+          recipients: perRecipient.map((r) => ({
+            id: r.recipient.id,
+            name: r.recipient.name,
+            phone: r.recipient.phone,
+            status: r.status,
+            errorCode: r.errorCode,
+          })),
+        });
+      }
     }
-    if (!phone) {
-      setStage("error");
-      setResult("No recipient phone number found for the selected contact.");
-      return;
+    if (isRunning) {
+      savedRef.current = false;
     }
-    setEvents([]);
-    setStage("sending");
-    setResult(null);
-    try {
-      const res = await ExpoSimSms.sendMultipartSms(
-        phone,
-        message ?? "",
-        selectedSim ?? undefined
-      );
-      setResult(
-        res.status === "sent"
-          ? `Sent to ${phone} (${res.partCount} part(s))`
-          : `Send reported: ${res.status}${res.errorCode ? ` (${res.errorCode})` : ""}`
-      );
-      setStage(res.status === "sent" ? "done" : "error");
-    } catch (e) {
-      setResult(`Error: ${(e as Error).message}`);
-      setStage("error");
-    }
-  }, [phone, message, selectedSim]);
-
-  const canAskAgain = permResult?.status === "denied" ? permResult.canAskAgain : true;
+    wasRunning.current = isRunning;
+  }, [isRunning, total, perRecipient]);
 
   return (
-    <YStack p="$4" gap="$4" flex={1}>
-      <H3>Phase 1 · SMS Module Test</H3>
+    <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+      <YStack p="$4" gap="$4" flex={1}>
+        <H3>Bulk Send</H3>
 
-      {permState === "denied" && (
-        <YStack gap="$2" p="$3" bg="$orange2" rounded="$3" borderWidth={1} borderColor="$orange8">
-          <Text color="$orange11" fontWeight="bold">
-            SMS & Phone permissions required
-          </Text>
-          <Paragraph size="$3" color="$orange11">
-            SMS Sender needs SMS and Phone permissions to detect SIM cards and
-            send messages.
-          </Paragraph>
-          <XStack gap="$2">
-            {canAskAgain ? (
-              <Button size="$3" theme="orange" onPress={requestPermissions}>
-                <Text>Grant permissions</Text>
-              </Button>
-            ) : (
-              <Button
-                size="$3"
-                theme="orange"
-                onPress={() => Linking.openSettings()}
-              >
-                <Text>Open Settings</Text>
-              </Button>
-            )}
-          </XStack>
-        </YStack>
-      )}
-
-      <YStack gap="$2">
-        <Text fontWeight="bold">Recipient</Text>
-        <Paragraph size="$3" color="$gray11">
-          {phone ? `${phone}` : "No number available"}
-          {count && Number(count) > 1 ? `  (+${count} selected total)` : ""}
-        </Paragraph>
-      </YStack>
-
-      <Separator />
-
-      <YStack gap="$2">
-        <XStack justify="space-between" items="center">
-          <Text fontWeight="bold">SIM cards</Text>
-          <Button size="$2" chromeless onPress={loadSims}>
-            <Text>Refresh</Text>
-          </Button>
-        </XStack>
-        {stage === "loading" ? (
-          <Spinner />
-        ) : sims.length === 0 ? (
-          <Paragraph size="$3" color="$gray11">
-            No active SIM detected. Ensure the app has SMS/Phone permissions.
-          </Paragraph>
+        {total === 0 ? (
+          <YStack gap="$3" flex={1} items="center" justify="center" p="$6">
+            <Paragraph color="$gray10">
+              No send in progress. Compose a message and press Send.
+            </Paragraph>
+          </YStack>
         ) : (
-          sims.map((sim) => {
-            const active = selectedSim === sim.subscriptionId;
-            return (
-              <Button
-                key={sim.id}
-                justify="flex-start"
-                theme={active ? "blue" : undefined}
-                onPress={() => setSelectedSim(sim.subscriptionId)}
-              >
-                <Text>
-                  {sim.displayName}
-                  {sim.carrierName ? ` · ${sim.carrierName}` : ""}
-                  {active ? "  ✓" : ""}
+          <>
+            <YStack gap="$2">
+              <XStack justify="space-between" items="center">
+                <Text fontWeight="bold">
+                  {doneCount}/{total}
                 </Text>
-              </Button>
-            );
-          })
+                <Badge>
+                  <Text fontSize="$2">
+                    {isPaused
+                      ? "Paused"
+                      : isRunning
+                        ? `${pct}%`
+                        : failed > 0
+                          ? "Completed with errors"
+                          : "Completed"}
+                  </Text>
+                </Badge>
+              </XStack>
+              <Progress size="$5" value={pct}>
+                <Progress.Indicator bg="$blue8" />
+              </Progress>
+            </YStack>
+
+            <XStack gap="$2" justify="space-between">
+              <YStack items="center">
+                <Text fontWeight="bold" color="$green10">{sent + delivered}</Text>
+                <Text fontSize="$2" color="$gray10">sent</Text>
+              </YStack>
+              <YStack items="center">
+                <Text fontWeight="bold">{doneCount}</Text>
+                <Text fontSize="$2" color="$gray10">total</Text>
+              </YStack>
+              <YStack items="center">
+                <Text fontWeight="bold" color="$red10">{failed}</Text>
+                <Text fontSize="$2" color="$gray10">failed</Text>
+              </YStack>
+            </XStack>
+
+            <XStack gap="$2">
+              {isRunning && !isPaused ? (
+                <Button flex={1} theme="orange" onPress={pause}>
+                  <Text>Pause</Text>
+                </Button>
+              ) : null}
+              {isRunning && isPaused ? (
+                <Button flex={1} theme="blue" onPress={resume}>
+                  <Text>Resume</Text>
+                </Button>
+              ) : null}
+              {isRunning ? (
+                <Button flex={1} theme="red" onPress={cancel}>
+                  <Text>Cancel</Text>
+                </Button>
+              ) : null}
+              {!isRunning && failed > 0 ? (
+                <Button flex={1} onPress={retryFailed}>
+                  <Text>Retry failed</Text>
+                </Button>
+              ) : null}
+            </XStack>
+
+            <Separator />
+
+            <YStack gap="$2">
+              <Text fontWeight="bold">Recipients</Text>
+              {perRecipient.length === 0 && isRunning ? (
+                <XStack gap="$2" items="center">
+                  <Spinner size="small" />
+                  <Text color="$gray10">Preparing queue...</Text>
+                </XStack>
+              ) : (
+                perRecipient.map((r) => (
+                  <RecipientRow key={r.recipient.id} record={r} />
+                ))
+              )}
+            </YStack>
+          </>
         )}
       </YStack>
+    </ScrollView>
+  );
+}
 
-      <Separator />
-
-      <YStack gap="$2">
-        <Text fontWeight="bold">Live status</Text>
-        {last ? (
-          <Paragraph size="$3">
-            {last.status}: {last.phone}
-            {last.errorCode ? ` (${last.errorCode})` : ""}
-            {last.partCount ? ` · ${last.partCount} part(s)` : ""}
-          </Paragraph>
-        ) : (
-          <Paragraph size="$3" color="$gray10">
-            No events yet.
-          </Paragraph>
-        )}
-      </YStack>
-
-      {result && (
-        <Paragraph
-          size="$3"
-          color={stage === "error" ? "$red10" : "$green10"}
-        >
-          {result}
-        </Paragraph>
-      )}
-
-      <Button
-        theme="blue"
-        size="$5"
-        disabled={stage === "sending" || !phone || permState !== "granted"}
-        onPress={sendTest}
-      >
-        <Text>
-          {stage === "sending" ? "Sending..." : "Send test SMS"}
+function RecipientRow({ record }: { record: RecipientStatus }) {
+  const meta = STATUS_META[record.status];
+  return (
+    <XStack justify="space-between" items="center" py="$1">
+      <YStack flex={1}>
+        <Text numberOfLines={1}>{record.recipient.name}</Text>
+        <Text fontSize="$2" color="$gray10">
+          {record.recipient.phone}
         </Text>
-      </Button>
-    </YStack>
+      </YStack>
+      <YStack items="flex-end" gap={1}>
+        <Text fontSize="$2" color={meta.color as any} fontWeight="bold">
+          {meta.label}
+        </Text>
+        {record.status === "failed" && record.errorCode ? (
+          <Text fontSize="$1" color="$red10">
+            {describeError(record.errorCode)}
+          </Text>
+        ) : null}
+      </YStack>
+    </XStack>
   );
 }
