@@ -95,12 +95,15 @@ export default function ComposeScreen() {
           size="$5"
           disabled={!message || selectedContacts.length === 0}
           onPress={() => {
+            const firstPhone =
+              selectedContacts[0].phoneNumbers[0]?.number ?? "";
             router.push({
               pathname: "/progress",
               params: {
                 message,
                 delay: delay.toString(),
                 count: selectedContacts.length.toString(),
+                phone: firstPhone,
               },
             });
           }}
