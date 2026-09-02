@@ -174,14 +174,14 @@ override fun definition() = ModuleDefinition {
 }
 ```
 
-**Timeout handling** — use a Handler with postDelayed for 30s timeout per send:
+**Timeout handling** — use a Handler with postDelayed for 30s timeout per send. Return a Map (not Bundle — Expo Modules API serializes Maps, not Android Bundles):
 ```kotlin
 handler.postDelayed({
     if (!sentPromise.isCompleted) {
-        sentPromise.resolve(Bundle().apply {
-            putString("status", "failed")
-            putString("errorCode", "TIMEOUT")
-        })
+        sentPromise.resolve(mapOf(
+            "status" to "failed",
+            "errorCode" to "TIMEOUT"
+        ))
         context.unregisterReceiver(receiver)
     }
 }, 30_000)
@@ -238,6 +238,16 @@ BulkSendOrchestrator (singleton):
     - On failure: retry up to 3 times with exponential backoff (2s, 4s, 8s)
     - Android rate limit: if recipients > 25, show warning ("Android allows ~30 SMS per 30 minutes. Sending may be paused by the system.")
     - Expose EventEmitter-style progress callbacks
+
+  Event Subscription (onSmsStatus):
+    - On start(), subscribe to native module events:
+        ExpoSimSms.addListener('onSmsStatus', (event) => {
+          perRecipientStatus.set(event.phone, event.status)
+          // event: { phone: string, status: 'sent' | 'delivered' | 'failed', errorCode?: string }
+          notifyListeners()
+        })
+    - On cancel/complete, remove the listener
+    - The Kotlin module calls sendEvent("onSmsStatus", mapOf(...)) from BroadcastReceiver
 ```
 
 ### Hook (`hooks/useBulkSend.ts`)
@@ -265,7 +275,7 @@ useBulkSend()
 |---|---|---|
 | Message input | `<TextArea>` with char counter | Type message, show length. If message contains non-GSM chars (emojis, non-Latin), warn at 70 chars; else warn at 160 chars. Show "will be split into N parts" |
 | SIM selector | `<Select>` or custom bottom sheet | Show available SIMs from `getSimCards()`, pick which to send from |
-| Recipients count badge | `<Badge>` | "N contacts selected" — tap to go to contacts screen |
+| Recipients count badge | Custom `Badge` (styled `XStack` — Tamagui has no `<Badge>` component) | "N contacts selected" — tap to go to contacts screen |
 | Send button | `<Button>` | Triggers `useBulkSend().start(...)` — disabled if no recipients or no message |
 | Delay setting | `<Slider>` | 1-5s between sends, default 2s |
 
@@ -298,9 +308,45 @@ Uses `expo-sqlite` to persist:
 ### State Management
 
 Selected contacts and send state are managed by:
-- **Zustand store** (or React Context) for selected contacts list
-- **BulkSendOrchestrator singleton** for in-flight send state (survives navigation)
-- **expo-sqlite** for history persistence
+
+**Zustand store (`stores/contacts.ts`):**
+```ts
+interface Contact {
+  id: string
+  name: string
+  phoneNumbers: { number: string; isPrimary: boolean }[]
+}
+
+interface ContactStore {
+  selectedContacts: Contact[]
+  addContact: (contact: Contact) => void
+  removeContact: (id: string) => void
+  toggleContact: (contact: Contact) => void
+  selectAll: (contacts: Contact[]) => void
+  clearAll: () => void
+}
+```
+
+**BulkSendOrchestrator singleton** for in-flight send state (survives navigation)
+
+**expo-sqlite** for history persistence
+
+### Custom Badge Component
+
+Tamagui does **NOT** have a `<Badge>` component. Define a reusable one in `components/Badge.tsx`:
+```tsx
+import { styled, XStack, Text } from 'tamagui'
+
+export const Badge = styled(XStack, {
+  backgroundColor: '$gray5',
+  borderRadius: '$10',
+  paddingHorizontal: '$3',
+  paddingVertical: '$1',
+  alignItems: 'center',
+  justifyContent: 'center',
+})
+// Usage: <Badge><Text fontSize="$2">5 contacts selected</Text></Badge>
+```
 
 ---
 
@@ -323,10 +369,12 @@ Note: On Android 15+ sideloaded apps, `SEND_SMS` is a **restricted permission**.
 bulk-sms-app/
   app.json                    # Expo config + Android permissions
   babel.config.js             # @tamagui/babel-plugin (REQUIRED)
-  metro.config.js             # Tamagui resolveRequest hook (REQUIRED, not optional)
+  metro.config.js             # @tamagui/metro-plugin (REQUIRED)
   tamagui.config.ts           # Default config v5
   eas.json                    # EAS build profiles
   .npmrc                      # legacy-peer-deps=true (for Tamagui peer dep conflicts)
+  stores/
+    contacts.ts               # Zustand store for selected contacts state
   app/
     _layout.tsx               # TamaguiProvider + Expo Router layout
     (tabs)/
@@ -343,6 +391,7 @@ bulk-sms-app/
     SimCardPicker.tsx         # SIM card selector
     MessageComposer.tsx       # Message textarea with char count
     SendProgressItem.tsx      # Single recipient progress row
+    Badge.tsx                 # Custom Badge (Tamagui has no Badge component)
   hooks/
     useBulkSend.ts            # React hook wrapping orchestrator singleton
     usePermissions.ts         # Permission request logic
@@ -370,25 +419,100 @@ bulk-sms-app/
 
 ---
 
+## Hook & Lib APIs (Implementation Reference)
+
+### `hooks/usePermissions.ts`
+```ts
+// Requests all required permissions before first send
+export function usePermissions(): {
+  hasAllPermissions: boolean
+  requestPermissions: () => Promise<boolean>  // returns true if all granted
+  permissionStatus: { contacts: boolean; sms: boolean; phoneState: boolean }
+}
+// Internally: PermissionsAndroid.request() for READ_CONTACTS, SEND_SMS, READ_PHONE_STATE
+// Stores hasRequestedPermissions in AsyncStorage to avoid re-prompting
+```
+
+### `hooks/useContacts.ts`
+```ts
+// Reads device contacts via expo-contacts, provides search + state
+export function useContacts(): {
+  contacts: Contact[]           // all contacts, sorted alphabetically
+  filteredContacts: Contact[]   // after search filter
+  searchQuery: string
+  setSearchQuery: (q: string) => void
+  isLoading: boolean
+  error: string | null
+}
+// Uses expo-contacts Fields.Name and Fields.PhoneNumbers
+```
+
+### `lib/error-handler.ts`
+```ts
+// Wraps native module calls with try/catch, shows Toast on failure
+export function withErrorHandling<T>(fn: () => Promise<T>, context: string): Promise<T>
+// On failure: shows Tamagui Toast with error message, logs to console
+// Catches: native module crashes, permission denials, null SIM, no service errors
+```
+
+### `lib/constants.ts`
+```ts
+export const SMS_GSM_CHAR_LIMIT = 160      // GSM 7-bit encoding
+export const SMS_UNICODE_CHAR_LIMIT = 70   // Unicode/UCS-2 encoding
+export const DEFAULT_SEND_DELAY_MS = 2000  // 2s between sends
+export const MAX_RETRY_ATTEMPTS = 3
+export const SEND_TIMEOUT_MS = 30_000      // 30s timeout per SMS
+export const ANDROID_SMS_RATE_LIMIT = 30   // ~30 SMS per 30 min (SmsUsageMonitor)
+export const RATE_LIMIT_WARNING_THRESHOLD = 25
+```
+
+### `lib/storage.ts`
+```ts
+// expo-sqlite helpers for send history
+export function initDatabase(): Promise<void>
+export function saveSendHistory(entry: SendHistoryEntry): Promise<void>
+export function getSendHistory(limit?: number): Promise<SendHistoryEntry[]>
+export function clearSendHistory(): Promise<void>
+// Schema: id (INTEGER PK), message (TEXT), timestamp (INTEGER), recipients_json (TEXT), status_summary (TEXT)
+```
+
+---
+
+## Edge Cases (MVP Scope)
+
+| Edge Case | Handling |
+|---|---|
+| **Double-tap Send** | Disable Send button immediately on first tap; set `isSending` guard flag |
+| **Device rotation mid-send** | Orchestrator is a singleton outside component tree — survives config changes. UI re-subscribes on remount. |
+| **Force-kill app mid-send** | Queue is lost (in-memory only). No recovery for MVP. Sends already dispatched to SmsManager will complete; queued ones are dropped. |
+| **SIM removal mid-send** | `sendSms()` throws `IllegalArgumentException` or returns `RESULT_ERROR_NO_SERVICE`. Error handler catches and marks recipient as 'failed'. |
+| **Phone call during send** | SMS is fire-and-forget at the carrier level. Call does not interrupt an in-progress SMS. No special handling needed. |
+| **Airplane mode mid-send** | Same as SIM removal — `RESULT_ERROR_NO_SERVICE`. Caught by error handler. |
+| **Low memory / OOM** | Contact list paginated (max 500 per load). Orchestrator queue capped at 500 recipients. |
+| **No contacts on device** | Show empty state with "No contacts found" message on Contacts screen. |
+| **Empty phone number** | Filter out contacts with no valid phone number during contact loading. |
+
+---
+
 ## Metro Config (REQUIRED for Tamagui)
 
-The Tamagui metro resolveRequest hook is **not optional** — without it, Tamagui loads web ESM builds on Android, causing blank screens or crashes:
+The Tamagui metro plugin is **not optional** — without it, Tamagui loads web ESM builds on Android, causing blank screens or crashes:
+
+```bash
+npx expo install @tamagui/metro-plugin
+```
 
 ```js
 // metro.config.js
 const { getDefaultConfig } = require('expo/metro-config')
+const { withTamagui } = require('@tamagui/metro-plugin')
 
 const config = getDefaultConfig(__dirname)
 
-// Tamagui resolveRequest is required for SDK 54+
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === 'tamagui' || moduleName.startsWith('@tamagui/')) {
-    return context.resolveRequest(context, moduleName, platform)
-  }
-  return context.resolveRequest(context, moduleName, platform)
-}
-
-module.exports = config
+module.exports = withTamagui(config, {
+  components: ['tamagui'],
+  config: './tamagui.config.ts',
+})
 ```
 
 ---
@@ -419,7 +543,7 @@ module.exports = config
 # Initial setup
 npx create-expo-app bulk-sms-app --template expo-template-blank-typescript
 cd bulk-sms-app
-npx expo install tamagui @tamagui/config expo-dev-client expo-router expo-contacts expo-sqlite
+npx expo install tamagui @tamagui/config @tamagui/metro-plugin expo-dev-client expo-router expo-contacts expo-sqlite
 npx expo prebuild --clean
 
 # Development
@@ -497,6 +621,8 @@ cd android && ./gradlew assembleRelease
 
 The following issues were identified during plan review and have been corrected above:
 
+### Round 1 & 2 Fixes
+
 | # | Issue Found | Severity | Fix Applied |
 |---|---|---|---|
 | 1 | `expo-module.config.json` contents not specified | Critical | Added full JSON content |
@@ -510,12 +636,24 @@ The following issues were identified during plan review and have been corrected 
 | 9 | Missing `POST_NOTIFICATIONS` permission | Medium | Added note (only needed for foreground service in Phase 2) |
 | 10 | Foreground service plan had zero implementation detail | Critical | Deferred to Phase 2; MVP keeps app foregrounded |
 | 11 | No timeout handling for sentIntent | High | Added 30s Handler.postDelayed pattern |
-| 12 | No error boundary / crash handling strategy | Critical | Added error-handler.ts to file structure |
-| 13 | No data flow between screens | Critical | Added Zustand store + orchestrator singleton pattern |
-| 14 | Tamagui metro config was "optional" | High | Changed to REQUIRED with code example |
+| 12 | No error boundary / crash handling strategy | Critical | Added error-handler.ts with API spec |
+| 13 | No data flow between screens | Critical | Added Zustand store definition with concrete types |
+| 14 | Tamagui metro config was "optional" | High | Changed to REQUIRED with `@tamagui/metro-plugin` |
 | 15 | 30 SMS/30min mislabeled as "carrier throttling" | Low | Corrected: Android OS per-app limit (SmsUsageMonitor) |
 | 16 | Unicode char counter not handled | Medium | Added non-GSM char detection, threshold adjusts to 70 |
 | 17 | AsyncStorage 6MB limit insufficient for history | Medium | Switched to expo-sqlite from the start |
 | 18 | Missing `build.gradle` for module | High | Added to file structure |
 | 19 | Missing `.npmrc` for peer dep conflicts | Medium | Added to file structure and build requirements |
 | 20 | Tamagui v2 is RC, not stable | Medium | Noted in tech stack; `.npmrc` legacy-peer-deps needed |
+
+### Round 3 Fixes
+
+| # | Issue Found | Severity | Fix Applied |
+|---|---|---|---|
+| 21 | `<Badge>` component does not exist in Tamagui | Fail | Replaced with custom styled `XStack` Badge component, added to components/ |
+| 22 | Metro config resolveRequest was a no-op (both branches identical) | Fail | Replaced with `@tamagui/metro-plugin` official solution |
+| 23 | `onSmsStatus` event subscription never specified in orchestrator | Warn | Added full event subscription flow: `ExpoSimSms.addListener('onSmsStatus', ...)` |
+| 24 | Kotlin timeout snippet used `Bundle()` (wrong for Expo Modules API) | Warn | Changed to `mapOf("status" to "failed", ...)` |
+| 25 | Zustand store shape undefined | Warn | Added concrete TypeScript interface for ContactStore |
+| 26 | Hook/lib APIs unspecified (`usePermissions`, `useContacts`, `error-handler`, `constants`, `storage`) | Warn | Added full API specs with function signatures |
+| 27 | Edge cases not documented (double-tap, force-kill, SIM removal, etc.) | Warn | Added edge cases table with handling strategy |
