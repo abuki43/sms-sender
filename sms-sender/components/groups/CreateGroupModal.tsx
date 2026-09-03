@@ -8,6 +8,8 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { ParsedContact } from "../../lib/csv-parser";
 import { createGroup, ContactGroup } from "../../lib/storage";
@@ -63,7 +65,10 @@ export function CreateGroupModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View style={styles.modalCard}>
           {/* Modal Header */}
           <View style={styles.headerRow}>
@@ -81,6 +86,7 @@ export function CreateGroupModal({
           <ScrollView
             contentContainerStyle={styles.scrollBody}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
             {/* Group Name Input */}
             <View style={styles.inputGroup}>
@@ -177,7 +183,7 @@ export function CreateGroupModal({
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

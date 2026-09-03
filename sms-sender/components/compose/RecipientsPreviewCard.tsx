@@ -35,6 +35,27 @@ interface GroupWithMembers {
   memberPhones: string[];
 }
 
+function formatRecipientSummary(
+  recipients: RecipientPreviewItem[],
+  groupName?: string | null
+): string {
+  if (recipients.length === 0) return "";
+  if (groupName) {
+    if (recipients.length <= 2) {
+      return `👥 ${groupName} · ${recipients.map((r) => r.name).join(", ")}`;
+    }
+    const firstNames = recipients.slice(0, 2).map((r) => r.name).join(", ");
+    const remaining = recipients.length - 2;
+    return `👥 ${groupName} · ${firstNames} +${remaining} others`;
+  }
+  if (recipients.length <= 3) {
+    return recipients.map((r) => r.name).join(", ");
+  }
+  const firstNames = recipients.slice(0, 2).map((r) => r.name).join(", ");
+  const remaining = recipients.length - 2;
+  return `${firstNames} +${remaining} others`;
+}
+
 export function RecipientsPreviewCard({
   recipients,
   onPress,
@@ -44,6 +65,7 @@ export function RecipientsPreviewCard({
   const [loadingGroups, setLoadingGroups] = useState(false);
 
   const selectedContacts = useContactsStore((s) => s.selectedContacts);
+  const selectedGroupName = useContactsStore((s) => s.selectedGroupName);
   const setSelectedContacts = useContactsStore((s) => s.setSelectedContacts);
   const clearAll = useContactsStore((s) => s.clearAll);
 
@@ -92,7 +114,7 @@ export function RecipientsPreviewCard({
       const updated = selectedContacts.filter(
         (c) => !c.phoneNumbers.some((p) => groupPhones.has(p.number))
       );
-      setSelectedContacts(updated);
+      setSelectedContacts(updated, null);
     } else {
       // SELECT GROUP: Add this group's members (preventing duplicates)
       const newEntries = members
@@ -108,7 +130,10 @@ export function RecipientsPreviewCard({
           phoneNumbers: [{ number: m.phone, isPrimary: true }],
         }));
 
-      setSelectedContacts([...selectedContacts, ...newEntries]);
+      setSelectedContacts(
+        [...selectedContacts, ...newEntries],
+        groupItem.group.name
+      );
     }
   };
 
@@ -198,7 +223,7 @@ export function RecipientsPreviewCard({
                   {recipients.length === 1 ? "recipient" : "recipients"} selected
                 </Text>
                 <Text style={styles.recipientSubtext} numberOfLines={1}>
-                  {recipients.map((r) => r.name).join(", ")}
+                  {formatRecipientSummary(recipients, selectedGroupName)}
                 </Text>
               </View>
             </View>
