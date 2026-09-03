@@ -22,11 +22,11 @@ export function DelaySettingCard({
           {delay.toFixed(1)}s delay
         </Badge>
       </View>
-
+{/* 
       <Text style={styles.delayDescription}>
         A delay between dispatches prevents carrier rate limits and safeguards
         delivery.
-      </Text>
+      </Text> */}
 
       <View style={styles.delayButtonRow}>
         {DELAY_OPTIONS.map((val) => {

@@ -141,6 +141,7 @@ export default function ContactsScreen() {
       id: m.id,
       name: m.name,
       phoneNumbers: [{ number: m.phone, isPrimary: true }],
+      customFields: m.customFields,
     }));
     setSelectedContacts(formattedContacts, selectedGroup?.name ?? null);
     router.push("/(tabs)/compose");
@@ -173,11 +174,11 @@ export default function ContactsScreen() {
     <View style={styles.container}>
       <AppHeader
         title="Contacts & Groups"
-        subtitle={
-          currentTab === "address_book"
-            ? "Select recipients from address book"
-            : "Manage custom recipient lists & CSV imports"
-        }
+        // subtitle={
+        //   currentTab === "address_book"
+        //     ? "Select recipients from address book"
+        //     : "Manage custom recipient lists & CSV imports"
+        // }
         rightElement={
           <TouchableOpacity
             style={styles.refreshButton}

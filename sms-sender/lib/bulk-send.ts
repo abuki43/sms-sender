@@ -8,6 +8,7 @@ import {
   MAX_RETRY_ATTEMPTS,
   RATE_LIMIT_WARNING_THRESHOLD,
 } from "./constants";
+import { resolveTemplate } from "./template-resolver";
 
 export type SendStatus =
   | "queued"
@@ -20,6 +21,7 @@ export interface SendRecipient {
   id: string;
   name: string;
   phone: string;
+  customFields?: Record<string, string>;
 }
 
 export interface RecipientStatus {
@@ -229,9 +231,10 @@ class BulkSendOrchestrator {
     recipient: SendRecipient
   ): Promise<SendMultipartSmsResult> {
     try {
+      const personalizedMessage = resolveTemplate(this.message, recipient);
       return await ExpoSimSms.sendMultipartSms(
         recipient.phone,
-        this.message,
+        personalizedMessage,
         this.simSubscriptionId
       );
     } catch (e) {

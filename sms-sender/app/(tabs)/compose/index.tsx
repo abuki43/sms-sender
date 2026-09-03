@@ -12,6 +12,7 @@ import { useBulkSend } from "../../../hooks/useBulkSend";
 import { requestSmsPermissions } from "../../../lib/permissions";
 import { SimCard } from "../../../modules/expo-sim-sms/src";
 import { RATE_LIMIT_WARNING_THRESHOLD } from "../../../lib/constants";
+import { extractAvailableTags } from "../../../lib/template-resolver";
 import { theme } from "../../../lib/theme";
 import { AppHeader } from "../../../components/AppHeader";
 import { Badge } from "../../../components/Badge";
@@ -24,6 +25,8 @@ import {
   SendConfirmModal,
   PermissionModal,
 } from "../../../components/compose/Modals";
+import { TemplatesModal } from "../../../components/templates/TemplatesModal";
+import { SaveTemplateModal } from "../../../components/templates/SaveTemplateModal";
 
 export default function ComposeScreen() {
   const [message, setMessage] = useState("");
@@ -32,6 +35,9 @@ export default function ComposeScreen() {
   const [simId, setSimId] = useState<string>("default");
   const [confirming, setConfirming] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
+  const [showTemplatesModal, setShowTemplatesModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+
   const router = useRouter();
   const selectedContacts = useContactsStore((s) => s.selectedContacts);
   const selectedGroupName = useContactsStore((s) => s.selectedGroupName);
@@ -71,9 +77,26 @@ export default function ComposeScreen() {
           c.phoneNumbers?.find((p) => p.isPrimary)?.number ??
           c.phoneNumbers?.[0]?.number ??
           "",
+        customFields: c.customFields,
       }))
       .filter((r) => r.phone.length > 0);
   }, [selectedContacts]);
+
+  const availableTags = useMemo(
+    () => extractAvailableTags(recipients),
+    [recipients]
+  );
+
+  const handleInsertTag = (tag: string) => {
+    const tagString = `{${tag}}`;
+    if (!message) {
+      setMessage(tagString + " ");
+    } else if (message.endsWith(" ")) {
+      setMessage(message + tagString + " ");
+    } else {
+      setMessage(message + " " + tagString + " ");
+    }
+  };
 
   const canSend = message.trim().length > 0 && recipients.length > 0;
 
@@ -97,7 +120,6 @@ export default function ComposeScreen() {
     <View style={styles.container}>
       <AppHeader
         title="Compose"
-        subtitle="Send SMS in bulk via your phone's SIM"
         rightElement={
           <Badge variant="primary" size="sm">
             {sims.length > 0 ? `${sims.length} SIM active` : "1 SIM active"}
@@ -116,6 +138,10 @@ export default function ComposeScreen() {
           charLimit={charLimit}
           hasUnicode={hasUnicode}
           parts={parts}
+          onOpenTemplates={() => setShowTemplatesModal(true)}
+          availableTags={availableTags}
+          onInsertTag={handleInsertTag}
+          sampleRecipient={recipients[0]}
         />
 
         <RecipientsPreviewCard
@@ -158,6 +184,22 @@ export default function ComposeScreen() {
 
         <View style={{ height: 32 }} />
       </ScrollView>
+
+      {/* Templates Selection Modal */}
+      <TemplatesModal
+        visible={showTemplatesModal}
+        onClose={() => setShowTemplatesModal(false)}
+        onSelectTemplate={(text) => setMessage(text)}
+        onOpenSaveModal={() => setShowSaveModal(true)}
+      />
+
+      {/* Save Template Modal */}
+      <SaveTemplateModal
+        visible={showSaveModal}
+        content={message}
+        onClose={() => setShowSaveModal(false)}
+        onSaved={() => {}}
+      />
 
       <SendConfirmModal
         visible={confirming}

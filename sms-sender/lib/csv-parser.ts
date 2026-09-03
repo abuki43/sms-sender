@@ -1,6 +1,7 @@
 export interface ParsedContact {
   name: string;
   phone: string;
+  customFields?: Record<string, string>;
 }
 
 export interface ParseResult {
@@ -105,7 +106,8 @@ const PHONE_HEADER_KEYWORDS = [
 ];
 
 /**
- * Parses raw CSV string content into a deduplicated list of valid contacts.
+ * Parses raw CSV string content into a deduplicated list of valid contacts,
+ * preserving all extra custom columns (e.g. Amount, DueDate, City, Code) for templating.
  */
 export function parseCsvContacts(csvText: string): ParseResult {
   const lines = csvText
@@ -118,14 +120,14 @@ export function parseCsvContacts(csvText: string): ParseResult {
   }
 
   const delimiter = detectDelimiter(lines[0]);
-  const firstRowCells = splitCsvRow(lines[0], delimiter);
+  const rawHeaders = splitCsvRow(lines[0], delimiter);
 
   let nameColIndex = -1;
   let phoneColIndex = -1;
   let startIndex = 0;
 
   // Check if first row is a header
-  firstRowCells.forEach((cell, idx) => {
+  rawHeaders.forEach((cell, idx) => {
     const cleanCell = cell.toLowerCase().replace(/[\s_-]/g, "");
     if (NAME_HEADER_KEYWORDS.some((k) => cleanCell.includes(k.replace(/_/g, "")))) {
       if (nameColIndex === -1) nameColIndex = idx;
@@ -139,17 +141,17 @@ export function parseCsvContacts(csvText: string): ParseResult {
 
   if (hasHeader) {
     startIndex = 1;
-    if (phoneColIndex === -1 && firstRowCells.length === 1) {
+    if (phoneColIndex === -1 && rawHeaders.length === 1) {
       phoneColIndex = 0;
     }
   } else {
     // No header detected. Examine first data row to deduce column types.
-    if (firstRowCells.length === 1) {
+    if (rawHeaders.length === 1) {
       phoneColIndex = 0;
     } else {
       // Find which column looks like a phone number
-      const c0Clean = sanitizePhoneNumber(firstRowCells[0]);
-      const c1Clean = sanitizePhoneNumber(firstRowCells[1] || "");
+      const c0Clean = sanitizePhoneNumber(rawHeaders[0]);
+      const c1Clean = sanitizePhoneNumber(rawHeaders[1] || "");
 
       if (isValidPhoneNumber(c0Clean) && !isValidPhoneNumber(c1Clean)) {
         phoneColIndex = 0;
@@ -174,7 +176,7 @@ export function parseCsvContacts(csvText: string): ParseResult {
     let rawName = nameColIndex !== -1 && cells[nameColIndex] ? cells[nameColIndex] : "";
 
     // If phoneCol was undefined or blank, search other cells for a valid phone number
-    if (!rawPhone) {
+    if (!isValidPhoneNumber(sanitizePhoneNumber(rawPhone))) {
       for (let c = 0; c < cells.length; c++) {
         const candidate = sanitizePhoneNumber(cells[c]);
         if (isValidPhoneNumber(candidate)) {
@@ -201,7 +203,25 @@ export function parseCsvContacts(csvText: string): ParseResult {
 
     seenPhones.add(cleanPhone);
     const finalName = rawName.trim() || `Contact ${validContacts.length + 1}`;
-    validContacts.push({ name: finalName, phone: cleanPhone });
+
+    // Extract all additional columns as customFields
+    const customFields: Record<string, string> = {};
+    if (hasHeader) {
+      rawHeaders.forEach((headerName, idx) => {
+        if (idx !== nameColIndex && idx !== phoneColIndex && headerName.trim()) {
+          const val = cells[idx] ? cells[idx].trim() : "";
+          if (val) {
+            customFields[headerName.trim()] = val;
+          }
+        }
+      });
+    }
+
+    validContacts.push({
+      name: finalName,
+      phone: cleanPhone,
+      customFields: Object.keys(customFields).length > 0 ? customFields : undefined,
+    });
   }
 
   return {
@@ -213,9 +233,20 @@ export function parseCsvContacts(csvText: string): ParseResult {
 }
 
 /**
- * Parses raw text input pasted by user (e.g. lines of "Name - Phone" or raw numbers).
+ * Parses raw text input pasted by user (multi-column CSV, TSV, or "Name - Phone" lines).
  */
 export function parsePastedContacts(rawText: string): ParseResult {
+  if (!rawText.trim()) {
+    return { contacts: [], totalParsed: 0, duplicateCount: 0, invalidCount: 0 };
+  }
+
+  // 1. If text has multi-column format (commas, semicolons, tabs, or headers), try parseCsvContacts first
+  const csvAttempt = parseCsvContacts(rawText);
+  if (csvAttempt.contacts.length > 0) {
+    return csvAttempt;
+  }
+
+  // 2. Fallback to line-by-line regex parsing
   const lines = rawText
     .split(/\r?\n/)
     .map((l) => l.trim())

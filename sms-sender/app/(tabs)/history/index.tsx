@@ -59,7 +59,6 @@ export default function HistoryScreen() {
     <View style={styles.container}>
       <AppHeader
         title="History"
-        subtitle="Archive of dispatched bulk SMS batches"
         rightElement={
           entries.length > 0 ? (
             <TouchableOpacity

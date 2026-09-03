@@ -4,6 +4,7 @@ export interface Contact {
   id: string;
   name: string;
   phoneNumbers: { number: string; isPrimary: boolean }[];
+  customFields?: Record<string, string>;
 }
 
 interface ContactStore {

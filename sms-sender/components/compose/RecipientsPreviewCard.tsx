@@ -128,6 +128,7 @@ export function RecipientsPreviewCard({
           id: m.id,
           name: m.name,
           phoneNumbers: [{ number: m.phone, isPrimary: true }],
+          customFields: m.customFields,
         }));
 
       setSelectedContacts(
@@ -195,9 +196,9 @@ export function RecipientsPreviewCard({
                 <Text style={styles.emptyRecipientTitle}>
                   No contacts selected
                 </Text>
-                <Text style={styles.emptyRecipientSubtitle}>
+                {/* <Text style={styles.emptyRecipientSubtitle}>
                   Tap to pick from contacts or choose a saved group
-                </Text>
+                </Text> */}
               </View>
             </View>
           ) : (

@@ -1,7 +1,15 @@
 import React from "react";
-import { View, Text, TextInput, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+} from "react-native";
 import { theme } from "../../lib/theme";
 import { Badge } from "../Badge";
+import { PlaceholderTagsBar } from "./PlaceholderTagsBar";
+import { resolveTemplate, hasPlaceholders } from "../../lib/template-resolver";
 
 interface MessageComposerCardProps {
   message: string;
@@ -10,6 +18,14 @@ interface MessageComposerCardProps {
   charLimit: number;
   hasUnicode: boolean;
   parts: number;
+  onOpenTemplates: () => void;
+  availableTags: string[];
+  onInsertTag: (tag: string) => void;
+  sampleRecipient?: {
+    name: string;
+    phone: string;
+    customFields?: Record<string, string>;
+  };
 }
 
 export function MessageComposerCard({
@@ -19,25 +35,52 @@ export function MessageComposerCard({
   charLimit,
   hasUnicode,
   parts,
+  onOpenTemplates,
+  availableTags,
+  onInsertTag,
+  sampleRecipient,
 }: MessageComposerCardProps) {
+  const showPreview = hasPlaceholders(message) && !!sampleRecipient;
+  const renderedSample = sampleRecipient
+    ? resolveTemplate(message, sampleRecipient)
+    : "";
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.cardLabel}>MESSAGE CONTENT</Text>
-        {hasUnicode ? (
-          <Badge variant="warning" size="sm">
-            Unicode (70 char limit)
-          </Badge>
-        ) : (
-          <Badge variant="sand" size="sm">
-            GSM 7-bit (160 char limit)
-          </Badge>
-        )}
+        <View style={styles.headerRightRow}>
+          <TouchableOpacity
+            style={styles.templatesBtn}
+            activeOpacity={0.7}
+            onPress={onOpenTemplates}
+          >
+            <Text style={styles.templatesBtnText}>📋 Templates</Text>
+          </TouchableOpacity>
+
+          {hasUnicode ? (
+            <Badge variant="warning" size="sm">
+              Unicode (70 limit)
+            </Badge>
+          ) : (
+            <Badge variant="sand" size="sm">
+              GSM (160 limit)
+            </Badge>
+          )}
+        </View>
+      </View>
+
+      {/* Dynamic Placeholder Tag Insert Bar */}
+      <View style={styles.tagsBarWrapper}>
+        <PlaceholderTagsBar
+          availableTags={availableTags}
+          onInsertTag={onInsertTag}
+        />
       </View>
 
       <TextInput
         style={styles.textArea}
-        placeholder="Type your SMS message here..."
+        placeholder="Type SMS or use {name}, {phone}, {Amount} tags..."
         placeholderTextColor={theme.colors.textMuted}
         multiline
         numberOfLines={5}
@@ -62,6 +105,19 @@ export function MessageComposerCard({
           </Badge>
         ) : null}
       </View>
+
+      {/* Live Sample Preview Box */}
+      {showPreview && (
+        <View style={styles.previewContainer}>
+          <View style={styles.previewHeader}>
+            <Text style={styles.previewTag}>👁 LIVE SAMPLE PREVIEW</Text>
+            <Text style={styles.previewContactName} numberOfLines={1}>
+              for {sampleRecipient.name || sampleRecipient.phone}
+            </Text>
+          </View>
+          <Text style={styles.previewBody}>{renderedSample}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -79,13 +135,32 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 8,
   },
   cardLabel: {
     fontSize: 11,
     fontWeight: "700",
     color: theme.colors.textSecondary,
     letterSpacing: 0.6,
+  },
+  headerRightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  templatesBtn: {
+    backgroundColor: theme.colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: theme.radius.sm,
+  },
+  templatesBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: theme.colors.primary,
+  },
+  tagsBarWrapper: {
+    marginBottom: 8,
   },
   textArea: {
     backgroundColor: theme.colors.primaryUltraLight,
@@ -102,11 +177,44 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 8,
   },
   charCounter: {
     fontSize: 12,
     color: theme.colors.textSecondary,
     fontWeight: "500",
+  },
+  previewContainer: {
+    marginTop: 12,
+    backgroundColor: theme.colors.cardSubtle,
+    borderRadius: theme.radius.md,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: theme.colors.primaryLight,
+    gap: 6,
+  },
+  previewHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 8,
+  },
+  previewTag: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: theme.colors.primary,
+    letterSpacing: 0.5,
+  },
+  previewContactName: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    fontWeight: "600",
+    flex: 1,
+    textAlign: "right",
+  },
+  previewBody: {
+    fontSize: 13,
+    color: theme.colors.textPrimary,
+    lineHeight: 18,
   },
 });

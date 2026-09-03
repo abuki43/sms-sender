@@ -36,6 +36,14 @@ export interface GroupMember {
   groupId: string;
   name: string;
   phone: string;
+  customFields?: Record<string, string>;
+  createdAt: number;
+}
+
+export interface MessageTemplate {
+  id: string;
+  title: string;
+  content: string;
   createdAt: number;
 }
 
@@ -67,14 +75,55 @@ async function createDatabase(): Promise<SQLite.SQLiteDatabase> {
       group_id TEXT NOT NULL,
       name TEXT NOT NULL,
       phone TEXT NOT NULL,
+      custom_fields_json TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS message_templates (
+      id TEXT PRIMARY KEY NOT NULL,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
       created_at INTEGER NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members (group_id);
   `);
 
-  // Safe migration for existing send_history tables
+  // Safe migrations
   try {
     await db.execAsync("ALTER TABLE send_history ADD COLUMN group_name TEXT;");
+  } catch {}
+  try {
+    await db.execAsync("ALTER TABLE group_members ADD COLUMN custom_fields_json TEXT;");
+  } catch {}
+
+  // Seed default starter templates if table is empty
+  try {
+    const existing = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM message_templates"
+    );
+    if (!existing || existing.count === 0) {
+      const now = Date.now();
+      await db.runAsync(
+        "INSERT INTO message_templates (id, title, content, created_at) VALUES (?, ?, ?, ?)",
+        "tpl_welcome",
+        "Welcome Greeting",
+        "Hello {first_name}, welcome to our community! We are excited to have you with us.",
+        now
+      );
+      await db.runAsync(
+        "INSERT INTO message_templates (id, title, content, created_at) VALUES (?, ?, ?, ?)",
+        "tpl_invoice",
+        "Payment Reminder",
+        "Dear {name}, this is a gentle reminder regarding your balance of {Amount}. Please call us at {phone}.",
+        now + 1
+      );
+      await db.runAsync(
+        "INSERT INTO message_templates (id, title, content, created_at) VALUES (?, ?, ?, ?)",
+        "tpl_appointment",
+        "Appointment Confirmation",
+        "Hi {first_name}, your appointment is confirmed for tomorrow. We look forward to seeing you!",
+        now + 2
+      );
+    }
   } catch {}
 
   return db;
@@ -135,7 +184,7 @@ function parseRecipients(json: string): RecipientHistory[] {
 
 export async function createGroup(
   name: string,
-  members: { name: string; phone: string }[]
+  members: { name: string; phone: string; customFields?: Record<string, string> }[]
 ): Promise<ContactGroup> {
   const db = await getDb();
   const groupId = "grp_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
@@ -151,11 +200,12 @@ export async function createGroup(
   for (const m of members) {
     const memberId = "mem_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
     await db.runAsync(
-      "INSERT INTO group_members (id, group_id, name, phone, created_at) VALUES (?, ?, ?, ?, ?)",
+      "INSERT INTO group_members (id, group_id, name, phone, custom_fields_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
       memberId,
       groupId,
       m.name.trim() || "Contact",
       m.phone.trim(),
+      m.customFields ? JSON.stringify(m.customFields) : null,
       now
     );
   }
@@ -198,19 +248,29 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
     group_id: string;
     name: string;
     phone: string;
+    custom_fields_json?: string | null;
     created_at: number;
   }>(
-    "SELECT id, group_id, name, phone, created_at FROM group_members WHERE group_id = ? ORDER BY name ASC",
+    "SELECT id, group_id, name, phone, custom_fields_json, created_at FROM group_members WHERE group_id = ? ORDER BY name ASC",
     groupId
   );
 
-  return rows.map((r) => ({
-    id: r.id,
-    groupId: r.group_id,
-    name: r.name,
-    phone: r.phone,
-    createdAt: r.created_at,
-  }));
+  return rows.map((r) => {
+    let customFields: Record<string, string> | undefined;
+    if (r.custom_fields_json) {
+      try {
+        customFields = JSON.parse(r.custom_fields_json);
+      } catch {}
+    }
+    return {
+      id: r.id,
+      groupId: r.group_id,
+      name: r.name,
+      phone: r.phone,
+      customFields,
+      createdAt: r.created_at,
+    };
+  });
 }
 
 export async function deleteGroup(groupId: string): Promise<void> {
@@ -222,4 +282,54 @@ export async function deleteGroup(groupId: string): Promise<void> {
 export async function removeGroupMember(memberId: string): Promise<void> {
   const db = await getDb();
   await db.runAsync("DELETE FROM group_members WHERE id = ?", memberId);
+}
+
+// ---------------------------------------------------------------------------
+// Message Templates CRUD API
+// ---------------------------------------------------------------------------
+
+export async function createTemplate(
+  title: string,
+  content: string
+): Promise<MessageTemplate> {
+  const db = await getDb();
+  const id = "tpl_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
+  const now = Date.now();
+
+  await db.runAsync(
+    "INSERT INTO message_templates (id, title, content, created_at) VALUES (?, ?, ?, ?)",
+    id,
+    title.trim() || "Untitled Template",
+    content.trim(),
+    now
+  );
+
+  return {
+    id,
+    title: title.trim() || "Untitled Template",
+    content: content.trim(),
+    createdAt: now,
+  };
+}
+
+export async function getTemplates(): Promise<MessageTemplate[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    id: string;
+    title: string;
+    content: string;
+    created_at: number;
+  }>("SELECT id, title, content, created_at FROM message_templates ORDER BY created_at DESC");
+
+  return rows.map((r) => ({
+    id: r.id,
+    title: r.title,
+    content: r.content,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function deleteTemplate(id: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync("DELETE FROM message_templates WHERE id = ?", id);
 }
