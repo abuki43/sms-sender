@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   BulkSendOptions,
   BulkSendProgress,
@@ -19,15 +19,29 @@ export function useBulkSend() {
     return bulkSendOrchestrator.subscribe(setState);
   }, []);
 
+  const start = useCallback(
+    (options: BulkSendOptions) => bulkSendOrchestrator.start(options),
+    []
+  );
+  const pause = useCallback(() => bulkSendOrchestrator.pause(), []);
+  const resume = useCallback(() => bulkSendOrchestrator.resume(), []);
+  const cancel = useCallback(() => bulkSendOrchestrator.cancel(), []);
+  const retryFailed = useCallback(() => bulkSendOrchestrator.retryFailed(), []);
+  const getSimCards = useCallback(() => bulkSendOrchestrator.getSimCards(), []);
+  const warnAboutRateLimit = useCallback(
+    () => bulkSendOrchestrator.warnAboutRateLimit(),
+    []
+  );
+
   return {
     progress: state,
-    start: (options: BulkSendOptions) => bulkSendOrchestrator.start(options),
-    pause: () => bulkSendOrchestrator.pause(),
-    resume: () => bulkSendOrchestrator.resume(),
-    cancel: () => bulkSendOrchestrator.cancel(),
-    retryFailed: () => bulkSendOrchestrator.retryFailed(),
-    getSimCards: () => bulkSendOrchestrator.getSimCards(),
-    warnAboutRateLimit: () => bulkSendOrchestrator.warnAboutRateLimit(),
+    start,
+    pause,
+    resume,
+    cancel,
+    retryFailed,
+    getSimCards,
+    warnAboutRateLimit,
   };
 }
 
