@@ -11,7 +11,7 @@ import {
   Paragraph,
 } from "tamagui";
 import { useNavigation } from "expo-router";
-import * as Contacts from "expo-contacts";
+import * as Contacts from "expo-contacts/legacy";
 import { useContactsStore } from "../../../stores/contacts";
 
 interface ContactItem {

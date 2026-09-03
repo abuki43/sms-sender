@@ -65,9 +65,12 @@ class SmsService(private val context: Context) {
 
         val finished = AtomicBoolean(false)
 
+        var sentReceiver: BroadcastReceiver? = null
+        var deliveredReceiver: BroadcastReceiver? = null
+
         fun cleanup() {
-            runCatching { context.unregisterReceiver(sentReceiver) }
-            runCatching { context.unregisterReceiver(deliveredReceiver) }
+            sentReceiver?.let { runCatching { context.unregisterReceiver(it) } }
+            deliveredReceiver?.let { runCatching { context.unregisterReceiver(it) } }
             handler.removeCallbacksAndMessages(requestIdBase)
         }
 
@@ -86,7 +89,7 @@ class SmsService(private val context: Context) {
             "multipart" to isMultipart
         )
 
-        val sentReceiver = object : BroadcastReceiver() {
+        val sReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != ACTION_SMS_SENT) return
                 when (resultCode) {
@@ -104,7 +107,7 @@ class SmsService(private val context: Context) {
             }
         }
 
-        val deliveredReceiver = object : BroadcastReceiver() {
+        val dReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 if (intent?.action != ACTION_SMS_DELIVERED) return
                 val status = if (resultCode == Activity.RESULT_OK) "delivered" else "failed"
@@ -118,8 +121,11 @@ class SmsService(private val context: Context) {
             }
         }
 
-        registerReceiverCompat(sentReceiver, IntentFilter(ACTION_SMS_SENT))
-        registerReceiverCompat(deliveredReceiver, IntentFilter(ACTION_SMS_DELIVERED))
+        sentReceiver = sReceiver
+        deliveredReceiver = dReceiver
+
+        registerReceiverCompat(sReceiver, IntentFilter(ACTION_SMS_SENT))
+        registerReceiverCompat(dReceiver, IntentFilter(ACTION_SMS_DELIVERED))
 
         for (index in parts.indices) {
             val requestCode = requestIdBase + index
@@ -184,14 +190,19 @@ class SmsService(private val context: Context) {
         return if (simSubscriptionId != null && simSubscriptionId >= 0) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 context.getSystemService(SmsManager::class.java)
-                    .createForSubscriptionId(simSubscriptionId)
+                    ?.createForSubscriptionId(simSubscriptionId)
             } else {
                 @Suppress("DEPRECATION")
                 SmsManager.getSmsManagerForSubscriptionId(simSubscriptionId)
             }
         } else {
             try {
-                SmsManager.getDefault()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    context.getSystemService(SmsManager::class.java) ?: SmsManager.getDefault()
+                } else {
+                    @Suppress("DEPRECATION")
+                    SmsManager.getDefault()
+                }
             } catch (e: Exception) {
                 null
             }
@@ -200,9 +211,10 @@ class SmsService(private val context: Context) {
 
     @Suppress("DEPRECATION")
     private fun registerReceiverCompat(
-        receiver: BroadcastReceiver,
+        receiver: BroadcastReceiver?,
         filter: IntentFilter
     ) {
+        if (receiver == null) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {

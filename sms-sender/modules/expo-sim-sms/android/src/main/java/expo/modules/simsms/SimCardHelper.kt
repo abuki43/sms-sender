@@ -87,10 +87,15 @@ object SimCardHelper {
             }
         }
 
+        val defaultSmsSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
+        if (defaultSmsSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            return defaultSmsSubId
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val defaultSubId = subscriptionManager.defaultDataSubscriptionId
-            if (defaultSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-                return defaultSubId
+            val defaultDataSubId = SubscriptionManager.getDefaultDataSubscriptionId()
+            if (defaultDataSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                return defaultDataSubId
             }
         }
 
