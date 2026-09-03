@@ -21,45 +21,52 @@ interface RecipientStatusRowProps {
   isLast: boolean;
 }
 
-export const RecipientStatusRow = memo(function RecipientStatusRow({
-  record,
-  isLast,
-}: RecipientStatusRowProps) {
-  const meta = STATUS_VARIANTS[record.status];
-  const initials = record.recipient.name
-    .split(" ")
-    .map((n) => n[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
+export const RecipientStatusRow = memo(
+  function RecipientStatusRow({
+    record,
+    isLast,
+  }: RecipientStatusRowProps) {
+    const meta = STATUS_VARIANTS[record.status] || STATUS_VARIANTS.queued;
+    const initials = record.recipient.name
+      .split(" ")
+      .map((n) => n[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase();
 
-  return (
-    <View style={[styles.recipientRow, isLast && { borderBottomWidth: 0 }]}>
-      <View style={styles.recipientAvatar}>
-        <Text style={styles.recipientAvatarText}>{initials || "#"}</Text>
-      </View>
+    return (
+      <View style={[styles.recipientRow, isLast && { borderBottomWidth: 0 }]}>
+        <View style={styles.recipientAvatar}>
+          <Text style={styles.recipientAvatarText}>{initials || "#"}</Text>
+        </View>
 
-      <View style={styles.recipientInfo}>
-        <Text style={styles.recipientName} numberOfLines={1}>
-          {record.recipient.name}
-        </Text>
-        <Text style={styles.recipientPhone}>{record.recipient.phone}</Text>
-      </View>
-
-      <View style={styles.statusCol}>
-        <Badge variant={meta.variant} size="sm">
-          {meta.label}
-        </Badge>
-        {record.status === "failed" && record.errorCode ? (
-          <Text style={styles.errorSubtext} numberOfLines={1}>
-            {describeError(record.errorCode)}
+        <View style={styles.recipientInfo}>
+          <Text style={styles.recipientName} numberOfLines={1}>
+            {record.recipient.name}
           </Text>
-        ) : null}
+          <Text style={styles.recipientPhone}>{record.recipient.phone}</Text>
+        </View>
+
+        <View style={styles.statusCol}>
+          <Badge variant={meta.variant} size="sm">
+            {meta.label}
+          </Badge>
+          {record.status === "failed" && record.errorCode ? (
+            <Text style={styles.errorSubtext} numberOfLines={1}>
+              {describeError(record.errorCode)}
+            </Text>
+          ) : null}
+        </View>
       </View>
-    </View>
-  );
-});
+    );
+  },
+  (prev, next) =>
+    prev.record.status === next.record.status &&
+    prev.record.errorCode === next.record.errorCode &&
+    prev.record.recipient.id === next.record.recipient.id &&
+    prev.isLast === next.isLast
+);
 
 const styles = StyleSheet.create({
   recipientRow: {

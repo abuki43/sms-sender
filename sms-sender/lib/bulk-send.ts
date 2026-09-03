@@ -87,7 +87,7 @@ class BulkSendOrchestrator {
 
   snapshot(): BulkSendProgress {
     const perRecipient = this.order.length
-      ? this.order.map((id) => this.perRecipient.get(id)!)
+      ? this.order.map((id) => ({ ...this.perRecipient.get(id)! }))
       : [];
     return {
       sent: perRecipient.filter((r) => r.status === "sent").length,
@@ -144,7 +144,10 @@ class BulkSendOrchestrator {
 
     // Upgrade sent -> delivered when a delivery report arrives.
     if (event.status === "delivered") {
-      record.status = "delivered";
+      this.perRecipient.set(recipient.id, {
+        ...record,
+        status: "delivered",
+      });
       this.emit();
     }
   };
@@ -173,24 +176,34 @@ class BulkSendOrchestrator {
   }
 
   private async sendWithRetry(record: RecipientStatus): Promise<boolean> {
+    const id = record.recipient.id;
     let attempt = 0;
     while (attempt < MAX_RETRY_ATTEMPTS && !this.cancelled) {
-      record.status = "sending";
-      record.attempts = attempt + 1;
+      this.perRecipient.set(id, {
+        ...this.perRecipient.get(id)!,
+        status: "sending",
+        attempts: attempt + 1,
+      });
       this.emit();
 
       const result = await this.sendOnce(record.recipient);
       if (this.cancelled) return false;
 
       if (result.status === "sent") {
-        record.status = "sent";
-        record.errorCode = null;
-        record.partCount = result.partCount;
+        this.perRecipient.set(id, {
+          ...this.perRecipient.get(id)!,
+          status: "sent",
+          errorCode: null,
+          partCount: result.partCount,
+        });
         this.emit();
         return true;
       }
 
-      record.errorCode = result.errorCode ?? null;
+      this.perRecipient.set(id, {
+        ...this.perRecipient.get(id)!,
+        errorCode: result.errorCode ?? null,
+      });
       attempt++;
       if (attempt < MAX_RETRY_ATTEMPTS) {
         // exponential backoff: 2s, 4s, 8s
@@ -199,7 +212,10 @@ class BulkSendOrchestrator {
       }
     }
 
-    record.status = "failed";
+    this.perRecipient.set(id, {
+      ...this.perRecipient.get(id)!,
+      status: "failed",
+    });
     this.emit();
     return false;
   }
