@@ -13,7 +13,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#ffffff",
+        "backgroundColor": "#FAF7F2",
         "foregroundImage": "./assets/bulkSMSfree.png"
       },
       "package": "com.sahuntech.smssender",
