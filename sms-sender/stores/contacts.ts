@@ -12,6 +12,7 @@ interface ContactStore {
   removeContact: (id: string) => void;
   toggleContact: (contact: Contact) => void;
   selectAll: (contacts: Contact[]) => void;
+  setSelectedContacts: (contacts: Contact[]) => void;
   clearAll: () => void;
 }
 
@@ -44,6 +45,8 @@ export const useContactsStore = create<ContactStore>((set) => ({
     }),
 
   selectAll: (contacts) => set({ selectedContacts: contacts }),
+
+  setSelectedContacts: (contacts) => set({ selectedContacts: contacts }),
 
   clearAll: () => set({ selectedContacts: [] }),
 }));
