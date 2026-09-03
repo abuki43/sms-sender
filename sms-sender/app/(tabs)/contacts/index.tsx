@@ -142,7 +142,7 @@ export default function ContactsScreen() {
       name: m.name,
       phoneNumbers: [{ number: m.phone, isPrimary: true }],
     }));
-    setSelectedContacts(formattedContacts);
+    setSelectedContacts(formattedContacts, selectedGroup?.name ?? null);
     router.push("/(tabs)/compose");
   };
 
