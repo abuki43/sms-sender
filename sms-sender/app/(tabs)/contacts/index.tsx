@@ -11,12 +11,7 @@ import {
   Paragraph,
 } from "tamagui";
 import { useNavigation } from "expo-router";
-import {
-  Contact,
-  ContactField,
-  ContactsSortOrder,
-  requestPermissionsAsync,
-} from "expo-contacts";
+import * as Contacts from "expo-contacts";
 import { useContactsStore } from "../../../stores/contacts";
 
 interface ContactItem {
@@ -40,29 +35,29 @@ export default function ContactsScreen() {
     useContactsStore();
 
   const loadContacts = useCallback(async () => {
-    const { status } = await requestPermissionsAsync();
+    const { status } = await Contacts.requestPermissionsAsync();
     if (status !== "granted") {
       setIsLoading(false);
       setIsRefreshing(false);
       return;
     }
 
-    const fields = [ContactField.FULL_NAME, ContactField.PHONES] as const;
-    const data = await Contact.getAllDetails(fields, {
-      sortOrder: ContactsSortOrder.GivenName,
+    const { data } = await Contacts.getContactsAsync({
+      fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      sort: Contacts.SortTypes.FirstName,
     });
 
-    const validContacts: ContactItem[] = data
+    const validContacts: ContactItem[] = (data || [])
       .filter(
-        (c): c is (typeof data)[number] & { fullName: string } =>
-          !!c.fullName && !!c.phones && c.phones.length > 0
+        (c) =>
+          !!c.name && !!c.phoneNumbers && c.phoneNumbers.length > 0 && !!c.id
       )
       .map((c) => ({
-        id: c.id,
-        name: c.fullName,
-        phoneNumbers: c.phones.map((p) => ({
+        id: c.id!,
+        name: c.name!,
+        phoneNumbers: (c.phoneNumbers || []).map((p) => ({
           number: p.number ?? "",
-          isPrimary: false,
+          isPrimary: !!p.isPrimary,
         })),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));

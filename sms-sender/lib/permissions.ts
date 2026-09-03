@@ -18,10 +18,10 @@ const REQUIRED_PERMISSIONS: Permission[] = [
 export async function checkSmsPermissions(): Promise<boolean> {
   if (Platform.OS !== "android") return true;
 
-  const results = await PermissionsAndroid.requestMultiple(REQUIRED_PERMISSIONS);
-  return REQUIRED_PERMISSIONS.every(
-    (permission) => results[permission] === PermissionsAndroid.RESULTS.GRANTED
+  const results = await Promise.all(
+    REQUIRED_PERMISSIONS.map((permission) => PermissionsAndroid.check(permission))
   );
+  return results.every(Boolean);
 }
 
 /**

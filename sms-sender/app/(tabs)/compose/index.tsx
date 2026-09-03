@@ -56,7 +56,7 @@ export default function ComposeScreen() {
   const recipients = selectedContacts.map((c) => ({
     id: c.id,
     name: c.name,
-    phone: c.phoneNumbers[0]?.number ?? "",
+    phone: c.phoneNumbers?.find((p) => p.isPrimary)?.number ?? c.phoneNumbers?.[0]?.number ?? "",
   })).filter((r) => r.phone.length > 0);
 
   const startSend = async () => {

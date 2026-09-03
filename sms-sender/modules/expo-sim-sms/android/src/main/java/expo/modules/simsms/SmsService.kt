@@ -124,11 +124,18 @@ class SmsService(private val context: Context) {
         for (index in parts.indices) {
             val requestCode = requestIdBase + index
 
+            val sentIntent = Intent(ACTION_SMS_SENT).apply {
+                `package` = context.packageName
+            }
+            val deliveredIntent = Intent(ACTION_SMS_DELIVERED).apply {
+                `package` = context.packageName
+            }
+
             sentIntents.add(
                 PendingIntent.getBroadcast(
                     context,
                     requestCode,
-                    Intent(ACTION_SMS_SENT),
+                    sentIntent,
                     PendingIntent.FLAG_IMMUTABLE
                 )
             )
@@ -136,7 +143,7 @@ class SmsService(private val context: Context) {
                 PendingIntent.getBroadcast(
                     context,
                     requestCode,
-                    Intent(ACTION_SMS_DELIVERED),
+                    deliveredIntent,
                     PendingIntent.FLAG_MUTABLE
                 )
             )

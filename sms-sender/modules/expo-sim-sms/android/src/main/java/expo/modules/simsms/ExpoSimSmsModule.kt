@@ -30,11 +30,11 @@ class ExpoSimSmsModule : Module() {
             }
         }
 
-        AsyncFunction("sendSms") { phone: String, message: String, subscriptionId: Int, promise: Promise ->
+        AsyncFunction("sendSms") { phone: String, message: String, subscriptionId: Int?, promise: Promise ->
             sendInternal(phone, message, subscriptionId, includePartCount = false, promise = promise)
         }
 
-        AsyncFunction("sendMultipartSms") { phone: String, message: String, subscriptionId: Int, promise: Promise ->
+        AsyncFunction("sendMultipartSms") { phone: String, message: String, subscriptionId: Int?, promise: Promise ->
             sendInternal(phone, message, subscriptionId, includePartCount = true, promise = promise)
         }
 
@@ -50,7 +50,7 @@ class ExpoSimSmsModule : Module() {
     private fun sendInternal(
         phone: String,
         message: String,
-        subscriptionId: Int,
+        subscriptionId: Int?,
         includePartCount: Boolean,
         promise: Promise
     ) {
@@ -66,7 +66,7 @@ class ExpoSimSmsModule : Module() {
         }
 
         val resolvedSubId =
-            SimCardHelper.resolveSubscriptionId(context(), -1, if (subscriptionId < 0) null else subscriptionId)
+            SimCardHelper.resolveSubscriptionId(context(), -1, if (subscriptionId == null || subscriptionId < 0) null else subscriptionId)
 
         smsService.send(phone, message, resolvedSubId) { result ->
             val status = result["status"] as? String ?: "unknown"
