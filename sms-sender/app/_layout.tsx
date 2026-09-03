@@ -1,34 +1,36 @@
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
 import { TamaguiProvider } from "tamagui";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import config from "../tamagui.config";
+import { theme } from "../lib/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-
   useEffect(() => {
     SplashScreen.hideAsync().catch(() => {});
   }, []);
 
   return (
-    <TamaguiProvider config={config} defaultTheme={colorScheme ?? "light"}>
-      <Stack>
+    <TamaguiProvider config={config} defaultTheme="light">
+      <Stack
+        screenOptions={{
+          contentStyle: { backgroundColor: theme.colors.bg },
+          animation: "fade",
+        }}
+      >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="progress"
           options={{
             presentation: "modal",
-            title: "Sending Messages",
+            headerShown: false,
           }}
         />
       </Stack>
-      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
+      <StatusBar style="dark" backgroundColor={theme.colors.bg} />
     </TamaguiProvider>
   );
 }
