@@ -53,6 +53,7 @@ export default function ProgressScreen() {
         savedRef.current = true;
         void saveSendHistory({
           message,
+          groupName: progress.groupName ?? null,
           timestamp: Date.now(),
           recipients: perRecipient.map((r) => ({
             id: r.recipient.id,

@@ -12,6 +12,7 @@ export interface SendHistoryEntry {
   id: number;
   message: string;
   timestamp: number;
+  groupName?: string | null;
   recipients: RecipientHistory[];
 }
 
@@ -19,6 +20,7 @@ export interface HistoryRow {
   id: number;
   message: string;
   timestamp: number;
+  group_name?: string | null;
   recipients_json: string;
 }
 
@@ -52,6 +54,7 @@ async function createDatabase(): Promise<SQLite.SQLiteDatabase> {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       message TEXT NOT NULL,
       timestamp INTEGER NOT NULL,
+      group_name TEXT,
       recipients_json TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS contact_groups (
@@ -68,6 +71,12 @@ async function createDatabase(): Promise<SQLite.SQLiteDatabase> {
     );
     CREATE INDEX IF NOT EXISTS idx_group_members_group_id ON group_members (group_id);
   `);
+
+  // Safe migration for existing send_history tables
+  try {
+    await db.execAsync("ALTER TABLE send_history ADD COLUMN group_name TEXT;");
+  } catch {}
+
   return db;
 }
 
@@ -80,9 +89,10 @@ export async function saveSendHistory(
 ): Promise<void> {
   const db = await getDb();
   await db.runAsync(
-    "INSERT INTO send_history (message, timestamp, recipients_json) VALUES (?, ?, ?)",
+    "INSERT INTO send_history (message, timestamp, group_name, recipients_json) VALUES (?, ?, ?, ?)",
     entry.message,
     entry.timestamp,
+    entry.groupName ?? null,
     JSON.stringify(entry.recipients)
   );
 }
@@ -92,13 +102,14 @@ export async function getSendHistory(
 ): Promise<SendHistoryEntry[]> {
   const db = await getDb();
   const rows = await db.getAllAsync<HistoryRow>(
-    "SELECT id, message, timestamp, recipients_json FROM send_history ORDER BY timestamp DESC LIMIT ?",
+    "SELECT id, message, timestamp, group_name, recipients_json FROM send_history ORDER BY timestamp DESC LIMIT ?",
     limit
   );
   return rows.map((row) => ({
     id: row.id,
     message: row.message,
     timestamp: row.timestamp,
+    groupName: row.group_name ?? null,
     recipients: parseRecipients(row.recipients_json),
   }));
 }

@@ -39,11 +39,13 @@ export interface BulkSendProgress {
   isRunning: boolean;
   isPaused: boolean;
   message: string;
+  groupName?: string | null;
 }
 
 export interface BulkSendOptions {
   recipients: SendRecipient[];
   message: string;
+  groupName?: string | null;
   simSubscriptionId?: number;
   delayMs?: number;
 }
@@ -61,6 +63,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 class BulkSendOrchestrator {
   private recipients: SendRecipient[] = [];
   private message = "";
+  private groupName?: string | null = null;
   private simSubscriptionId?: number;
   private delayMs = DEFAULT_SEND_DELAY_MS;
 
@@ -98,6 +101,7 @@ class BulkSendOrchestrator {
       isRunning: this.isRunning,
       isPaused: this.isPaused,
       message: this.message,
+      groupName: this.groupName,
     };
   }
 
@@ -106,6 +110,7 @@ class BulkSendOrchestrator {
 
     this.recipients = options.recipients;
     this.message = options.message;
+    this.groupName = options.groupName ?? null;
     this.simSubscriptionId = options.simSubscriptionId;
     this.delayMs = options.delayMs ?? DEFAULT_SEND_DELAY_MS;
     this.cancelled = false;

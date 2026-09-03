@@ -34,6 +34,7 @@ export default function ComposeScreen() {
   const [permissionDenied, setPermissionDenied] = useState(false);
   const router = useRouter();
   const selectedContacts = useContactsStore((s) => s.selectedContacts);
+  const selectedGroupName = useContactsStore((s) => s.selectedGroupName);
   const { start, getSimCards } = useBulkSend();
 
   useEffect(() => {
@@ -85,6 +86,7 @@ export default function ComposeScreen() {
     start({
       recipients,
       message,
+      groupName: selectedGroupName ?? null,
       simSubscriptionId: selectedSim?.subscriptionId,
       delayMs: Math.round(delay * 1000),
     });

@@ -14,11 +14,26 @@ function formatTimestamp(ts: number): string {
   });
 }
 
+function formatRecipientNames(entry: SendHistoryEntry): string {
+  if (entry.groupName) {
+    return `👥 ${entry.groupName} (${entry.recipients.length})`;
+  }
+  if (entry.recipients.length === 0) return "0 recipients";
+  if (entry.recipients.length <= 2) {
+    return entry.recipients.map((r) => r.name).join(", ");
+  }
+  const firstNames = entry.recipients.slice(0, 2).map((r) => r.name).join(", ");
+  const remaining = entry.recipients.length - 2;
+  return `${firstNames} +${remaining} others`;
+}
+
 interface HistoryCardProps {
   entry: SendHistoryEntry;
 }
 
-export const HistoryCard = memo(function HistoryCard({ entry }: HistoryCardProps) {
+export const HistoryCard = memo(function HistoryCard({
+  entry,
+}: HistoryCardProps) {
   const sentCount = entry.recipients.filter(
     (r) => r.status === "sent" || r.status === "delivered"
   ).length;
@@ -31,9 +46,17 @@ export const HistoryCard = memo(function HistoryCard({ entry }: HistoryCardProps
   return (
     <View style={styles.historyCard}>
       <View style={styles.cardHeader}>
-        <Badge variant="sand" size="sm">
-          {formatTimestamp(entry.timestamp)}
-        </Badge>
+        <View style={styles.headerLeftGroup}>
+          <Badge variant="sand" size="sm">
+            {formatTimestamp(entry.timestamp)}
+          </Badge>
+          {entry.groupName ? (
+            <Badge variant="primary" size="sm">
+              👥 {entry.groupName}
+            </Badge>
+          ) : null}
+        </View>
+
         <Badge variant={allDelivered ? "success" : "warning"} size="sm">
           {allDelivered ? "100% Sent" : `${sentCount}/${totalCount} Sent`}
         </Badge>
@@ -44,8 +67,8 @@ export const HistoryCard = memo(function HistoryCard({ entry }: HistoryCardProps
       </Text>
 
       <View style={styles.cardFooter}>
-        <Text style={styles.recipientCountText}>
-          To {totalCount} {totalCount === 1 ? "recipient" : "recipients"}
+        <Text style={styles.recipientCountText} numberOfLines={1}>
+          To {formatRecipientNames(entry)}
         </Text>
         {failedCount > 0 ? (
           <Text style={styles.failedText}>{failedCount} failed</Text>
@@ -71,6 +94,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 10,
+    gap: 8,
+  },
+  headerLeftGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+    flex: 1,
   },
   messageText: {
     fontSize: 14,
@@ -85,11 +116,13 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: theme.colors.cardSubtle,
+    gap: 8,
   },
   recipientCountText: {
     fontSize: 12,
     color: theme.colors.textSecondary,
     fontWeight: "500",
+    flex: 1,
   },
   failedText: {
     fontSize: 12,
