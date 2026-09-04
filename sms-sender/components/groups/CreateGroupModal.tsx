@@ -14,7 +14,7 @@ import {
 import { ParsedContact } from "../../lib/csv-parser";
 import { createGroup, ContactGroup } from "../../lib/storage";
 import { theme } from "../../lib/theme";
-import { IconClose, IconCheck } from "../Icons";
+import { IconClose, IconCheck, IconFileText, IconClipboard } from "../Icons";
 import { CsvImportView } from "./CsvImportView";
 import { SmartPasteView } from "./SmartPasteView";
 
@@ -103,7 +103,7 @@ export function CreateGroupModal({
               />
             </View>
 
-            {/* Segmented Tab Selector */}
+            {/* Segmented Tab Selector with Real Vector Icons */}
             <View style={styles.tabBar}>
               <TouchableOpacity
                 style={[
@@ -115,13 +115,21 @@ export function CreateGroupModal({
                   setParsedContacts([]);
                 }}
               >
+                <IconFileText
+                  size={15}
+                  color={
+                    activeTab === "csv"
+                      ? theme.colors.primary
+                      : theme.colors.textSecondary
+                  }
+                />
                 <Text
                   style={[
                     styles.tabItemText,
                     activeTab === "csv" && styles.tabItemTextActive,
                   ]}
                 >
-                  📁 CSV / Text File
+                  CSV / Text File
                 </Text>
               </TouchableOpacity>
 
@@ -135,13 +143,21 @@ export function CreateGroupModal({
                   setParsedContacts([]);
                 }}
               >
+                <IconClipboard
+                  size={15}
+                  color={
+                    activeTab === "paste"
+                      ? theme.colors.primary
+                      : theme.colors.textSecondary
+                  }
+                />
                 <Text
                   style={[
                     styles.tabItemText,
                     activeTab === "paste" && styles.tabItemTextActive,
                   ]}
                 >
-                  📋 Smart Paste
+                  Smart Paste
                 </Text>
               </TouchableOpacity>
             </View>
@@ -262,10 +278,12 @@ const styles = StyleSheet.create({
   },
   tabItem: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: theme.radius.sm,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    gap: 6,
   },
   tabItemActive: {
     backgroundColor: theme.colors.card,
@@ -278,6 +296,7 @@ const styles = StyleSheet.create({
   },
   tabItemTextActive: {
     color: theme.colors.primary,
+    fontWeight: "700",
   },
   errorBanner: {
     fontSize: 13,

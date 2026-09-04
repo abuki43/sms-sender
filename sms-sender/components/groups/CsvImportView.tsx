@@ -9,7 +9,7 @@ import {
 import { parseCsvContacts, ParsedContact } from "../../lib/csv-parser";
 import { theme } from "../../lib/theme";
 import { Badge } from "../Badge";
-import { IconCheck, IconWarning } from "../Icons";
+import { IconCheck, IconWarning, IconUpload } from "../Icons";
 
 interface CsvImportViewProps {
   onContactsParsed: (contacts: ParsedContact[]) => void;
@@ -36,13 +36,13 @@ export function CsvImportView({ onContactsParsed }: CsvImportViewProps) {
         DocumentPicker = await import("expo-document-picker");
       } catch (err) {
         throw new Error(
-          "Document Picker native module is not in your current APK build. Please use the '📋 Smart Paste' tab to paste your CSV text directly, or rebuild with EAS."
+          "Document Picker native module is not in your current APK build. Please use the 'Smart Paste' tab to paste your CSV text directly, or rebuild with EAS."
         );
       }
 
       if (!DocumentPicker || !DocumentPicker.getDocumentAsync) {
         throw new Error(
-          "Document Picker is not available. Please use the '📋 Smart Paste' tab to paste your CSV text directly."
+          "Document Picker is not available. Please use the 'Smart Paste' tab to paste your CSV text directly."
         );
       }
 
@@ -107,7 +107,7 @@ export function CsvImportView({ onContactsParsed }: CsvImportViewProps) {
         ) : (
           <>
             <View style={styles.uploadIconCircle}>
-              <Text style={styles.uploadEmoji}>📄</Text>
+              <IconUpload size={22} color={theme.colors.primary} />
             </View>
             <Text style={styles.uploadTitle}>
               {fileName ? fileName : "Tap to Select CSV or Text File"}

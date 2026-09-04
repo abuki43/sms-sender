@@ -133,4 +133,4 @@ eas build -p android --profile development
 
 ---
 
--- Developed by Abubeker abe.
+-- Developed by Abuki.

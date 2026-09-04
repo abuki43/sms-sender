@@ -20,7 +20,7 @@ import {
 } from "../../../lib/storage";
 import { theme } from "../../../lib/theme";
 import { AppHeader } from "../../../components/AppHeader";
-import { IconContacts, IconRefresh } from "../../../components/Icons";
+import { IconContacts, IconRefresh, IconPlus, IconUser, IconUsers } from "../../../components/Icons";
 import { ContactSearchBar } from "../../../components/contacts/ContactSearchBar";
 import { ContactActionBar } from "../../../components/contacts/ContactActionBar";
 import {
@@ -173,11 +173,6 @@ export default function ContactsScreen() {
     <View style={styles.container}>
       <AppHeader
         title="Contacts & Groups"
-        // subtitle={
-        //   currentTab === "address_book"
-        //     ? "Select recipients from address book"
-        //     : "Manage custom recipient lists & CSV imports"
-        // }
         rightElement={
           <TouchableOpacity
             style={styles.refreshButton}
@@ -206,13 +201,21 @@ export default function ContactsScreen() {
             ]}
             onPress={() => setCurrentTab("address_book")}
           >
+            <IconUser
+              size={15}
+              color={
+                currentTab === "address_book"
+                  ? theme.colors.primary
+                  : theme.colors.textSecondary
+              }
+            />
             <Text
               style={[
                 styles.segmentedTabText,
                 currentTab === "address_book" && styles.segmentedTabTextActive,
               ]}
             >
-              👤 Address Book
+              Address Book
             </Text>
           </TouchableOpacity>
 
@@ -223,13 +226,21 @@ export default function ContactsScreen() {
             ]}
             onPress={() => setCurrentTab("groups")}
           >
+            <IconUsers
+              size={15}
+              color={
+                currentTab === "groups"
+                  ? theme.colors.primary
+                  : theme.colors.textSecondary
+              }
+            />
             <Text
               style={[
                 styles.segmentedTabText,
                 currentTab === "groups" && styles.segmentedTabTextActive,
               ]}
             >
-              👥 Contact Groups ({groups.length})
+              Contact Groups ({groups.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -310,7 +321,9 @@ export default function ContactsScreen() {
             activeOpacity={0.8}
             onPress={() => setShowCreateGroup(true)}
           >
-            <Text style={styles.createGroupCTAEmoji}>➕</Text>
+            <View style={styles.createGroupIconBox}>
+              <IconPlus size={18} color="#FFFFFF" />
+            </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.createGroupCTATitle}>
                 Create New Group
@@ -452,8 +465,13 @@ const styles = StyleSheet.create({
     gap: 12,
     ...theme.shadow.sm,
   },
-  createGroupCTAEmoji: {
-    fontSize: 20,
+  createGroupIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: theme.radius.full,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
   },
   createGroupCTATitle: {
     fontSize: 14,

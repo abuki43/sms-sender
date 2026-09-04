@@ -61,3 +61,31 @@ export function IconPause({ size = 16, color = "#B45309" }: IconProps) {
 export function IconPlay({ size = 16, color = "#FFFFFF" }: IconProps) {
   return <Ionicons name="play" size={size} color={color} />;
 }
+
+export function IconFileText({ size = 16, color = "#3D2619" }: IconProps) {
+  return <Feather name="file-text" size={size} color={color} />;
+}
+
+export function IconClipboard({ size = 16, color = "#3D2619" }: IconProps) {
+  return <Feather name="clipboard" size={size} color={color} />;
+}
+
+export function IconUpload({ size = 22, color = "#8A5836" }: IconProps) {
+  return <Feather name="upload-cloud" size={size} color={color} />;
+}
+
+export function IconPlus({ size = 16, color = "#FFFFFF" }: IconProps) {
+  return <Feather name="plus" size={size} color={color} />;
+}
+
+export function IconUser({ size = 16, color = "#3D2619" }: IconProps) {
+  return <Feather name="user" size={size} color={color} />;
+}
+
+export function IconUsers({ size = 16, color = "#3D2619" }: IconProps) {
+  return <Feather name="users" size={size} color={color} />;
+}
+
+export function IconBookmark({ size = 16, color = "#3D2619" }: IconProps) {
+  return <Feather name="bookmark" size={size} color={color} />;
+}
