@@ -16,7 +16,7 @@ function formatTimestamp(ts: number): string {
 
 function formatRecipientNames(entry: SendHistoryEntry): string {
   if (entry.groupName) {
-    return `👥 ${entry.groupName} (${entry.recipients.length})`;
+    return `Group: ${entry.groupName} (${entry.recipients.length})`;
   }
   if (entry.recipients.length === 0) return "0 recipients";
   if (entry.recipients.length <= 2) {
@@ -52,7 +52,7 @@ export const HistoryCard = memo(function HistoryCard({
           </Badge>
           {entry.groupName ? (
             <Badge variant="primary" size="sm">
-              👥 {entry.groupName}
+              {entry.groupName}
             </Badge>
           ) : null}
         </View>

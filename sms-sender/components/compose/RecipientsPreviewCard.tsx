@@ -42,11 +42,11 @@ function formatRecipientSummary(
   if (recipients.length === 0) return "";
   if (groupName) {
     if (recipients.length <= 2) {
-      return `👥 ${groupName} · ${recipients.map((r) => r.name).join(", ")}`;
+      return `${groupName} · ${recipients.map((r) => r.name).join(", ")}`;
     }
     const firstNames = recipients.slice(0, 2).map((r) => r.name).join(", ");
     const remaining = recipients.length - 2;
-    return `👥 ${groupName} · ${firstNames} +${remaining} others`;
+    return `${groupName} · ${firstNames} +${remaining} others`;
   }
   if (recipients.length <= 3) {
     return recipients.map((r) => r.name).join(", ");
@@ -175,7 +175,8 @@ export function RecipientsPreviewCard({
                 setShowGroupPicker(true);
               }}
             >
-              <Text style={styles.groupQuickBtnText}>👥 Pick Group</Text>
+              <IconContacts size={13} color={theme.colors.primary} />
+              <Text style={styles.groupQuickBtnText}>Pick Group</Text>
             </TouchableOpacity>
 
             <View style={styles.rowCentered}>
@@ -381,9 +382,12 @@ const styles = StyleSheet.create({
   },
   groupQuickBtn: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
     borderRadius: theme.radius.sm,
     backgroundColor: theme.colors.primaryLight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   groupQuickBtnText: {
     fontSize: 11,
