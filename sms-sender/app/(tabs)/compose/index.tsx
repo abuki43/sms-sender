@@ -97,7 +97,7 @@ export default function ComposeScreen() {
     <View style={styles.container}>
       <AppHeader
         title="Compose"
-        subtitle="Send SMS in bulk via your phone's SIM"
+        // subtitle="Send SMS in bulk via your phone's SIM"
         rightElement={
           <Badge variant="primary" size="sm">
             {sims.length > 0 ? `${sims.length} SIM active` : "1 SIM active"}

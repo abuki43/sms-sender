@@ -23,10 +23,10 @@ export function DelaySettingCard({
         </Badge>
       </View>
 
-      <Text style={styles.delayDescription}>
+      {/* <Text style={styles.delayDescription}>
         A delay between dispatches prevents carrier rate limits and safeguards
         delivery.
-      </Text>
+      </Text> */}
 
       <View style={styles.delayButtonRow}>
         {DELAY_OPTIONS.map((val) => {
